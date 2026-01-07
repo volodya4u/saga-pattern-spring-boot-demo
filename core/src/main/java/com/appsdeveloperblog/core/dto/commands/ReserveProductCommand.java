@@ -1,4 +1,4 @@
-package com.appsdeveloperblog.core.dto.events;
+package com.appsdeveloperblog.core.dto.commands;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -7,15 +7,14 @@ import lombok.Setter;
 
 import java.util.UUID;
 
+@AllArgsConstructor
+@NoArgsConstructor
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
-public class OrderCreatedEvent {
+public class ReserveProductCommand {
 
-    private UUID orderId;
-    private UUID customerId;
     private UUID productId;
     private Integer productQuantity;
+    private UUID orderId;
 
 }
