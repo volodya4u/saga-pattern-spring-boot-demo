@@ -5,4 +5,4 @@ updates:
       - "/"
       - "/core"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
