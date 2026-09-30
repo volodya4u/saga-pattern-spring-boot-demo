@@ -13,8 +13,12 @@ public class KafkaConfig {
 
     @Value("${products.events.topic.name}")
     private String productEventsTopicName;
-    private final static Integer TOPIC_REPLICATION_FACTOR = 3;
-    private final static Integer TOPIC_PARTITIONS = 3;
+
+    @Value("${app.kafka.topic.replicas}")
+    private int topicReplicationFactor;
+
+    @Value("${app.kafka.topic.partitions}")
+    private int topicPartitions;
 
     @Bean
     KafkaTemplate<String, Object> kafkaTemplate(ProducerFactory<String, Object> producerFactory) {
@@ -24,8 +28,8 @@ public class KafkaConfig {
     @Bean
     NewTopic createProductEventsTopic() {
         return TopicBuilder.name(productEventsTopicName)
-                .partitions(TOPIC_PARTITIONS)
-                .replicas(TOPIC_REPLICATION_FACTOR)
+                .partitions(topicPartitions)
+                .replicas(topicReplicationFactor)
                 .build();
     }
 }
