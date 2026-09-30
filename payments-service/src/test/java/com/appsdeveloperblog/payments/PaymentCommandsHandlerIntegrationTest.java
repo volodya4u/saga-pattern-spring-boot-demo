@@ -44,7 +44,7 @@ import com.appsdeveloperblog.payments.dao.jpa.entity.PaymentEntity;
 import com.appsdeveloperblog.payments.dao.jpa.repository.PaymentRepository;
 import com.appsdeveloperblog.payments.service.CreditCardProcessorRemoteService;
 
-@EmbeddedKafka(partitions = 1, topics = {"payments-commands", "payments-events"})
+@EmbeddedKafka(partitions = 3, topics = {"payments-commands", "payments-events"})
 @SpringBootTest(properties = {
         "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
         "app.kafka.topic.replicas=1"})
@@ -70,17 +70,19 @@ class PaymentCommandsHandlerIntegrationTest {
     @BeforeEach
     void setUp() {
         for (MessageListenerContainer container : listenerRegistry.getListenerContainers()) {
-            ContainerTestUtils.waitForAssignment(container, 1);
+            ContainerTestUtils.waitForAssignment(container, embeddedKafka.getPartitionsPerTopic());
         }
         Map<String, Object> props = KafkaTestUtils.consumerProps(embeddedKafka, "test-" + UUID.randomUUID(), false);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JacksonJsonDeserializer.class);
         props.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "com.appsdeveloperblog.core.*");
         paymentEvents = new KafkaConsumer<>(props);
-        TopicPartition partition = new TopicPartition("payments-events", 0);
-        paymentEvents.assign(List.of(partition));
-        paymentEvents.seekToEnd(List.of(partition));
-        paymentEvents.position(partition);
+        List<TopicPartition> partitions = paymentEvents.partitionsFor("payments-events").stream()
+                .map(info -> new TopicPartition(info.topic(), info.partition()))
+                .toList();
+        paymentEvents.assign(partitions);
+        paymentEvents.seekToEnd(partitions);
+        partitions.forEach(paymentEvents::position);
     }
 
     @AfterEach

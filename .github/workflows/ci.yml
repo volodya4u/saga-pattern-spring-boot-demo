@@ -57,8 +57,9 @@ jobs:
       - name: Package
         run: mvn -B -ntp package -DskipTests
 
-      # orders-service creates the command topics the other services consume,
-      # so it starts first. A single broker, so topics get one replica.
+      # Each service creates the topics it publishes to: orders-service the
+      # command topics, products-service and payments-service their event topics.
+      # A single broker, so topics get one replica.
       - name: Start services
         run: |
           kafka='--spring.kafka.bootstrap-servers=localhost:9092 --app.kafka.topic.replicas=1'
@@ -75,9 +76,21 @@ jobs:
           start products-service "$kafka"
           start payments-service "$kafka"
           wait_for credit-card-processor-service 'Started CreditCardProcessorApplication' 1
-          wait_for orders-service 'partitions assigned' 2
           wait_for products-service 'partitions assigned' 1
           wait_for payments-service 'partitions assigned' 1
+          # The saga subscribes to the event topics as they appear; wait until it
+          # owns all their partitions, or it would skip earlier events.
+          timeout 120 bash -c 'until grep "partitions assigned" orders-service.log |
+            grep "products-events-2" | grep -q "payments-events-2"; do sleep 2; done'
+
+      - name: Check that the services created their topics
+        run: |
+          for topic in orders-events orders-commands products-commands products-events \
+            payments-commands payments-events; do
+            docker exec ${{ job.services.kafka.id }} /opt/kafka/bin/kafka-topics.sh \
+              --bootstrap-server localhost:9092 --describe --topic "$topic" | head -1 | tee topic.txt
+            grep -q "PartitionCount: 3" topic.txt
+          done
 
       - name: Create a product with 5 in stock
         run: |

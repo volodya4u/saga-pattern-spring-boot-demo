@@ -38,7 +38,7 @@ import com.appsdeveloperblog.core.dto.events.ProductReservedEvent;
 import com.appsdeveloperblog.products.dao.jpa.entity.ProductEntity;
 import com.appsdeveloperblog.products.dao.jpa.repository.ProductRepository;
 
-@EmbeddedKafka(partitions = 1, topics = {"products-commands", "products-events"})
+@EmbeddedKafka(partitions = 3, topics = {"products-commands", "products-events"})
 @SpringBootTest(properties = {
         "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
         "app.kafka.topic.replicas=1"})
@@ -61,17 +61,19 @@ class ProductCommandsHandlerIntegrationTest {
     @BeforeEach
     void setUp() {
         for (MessageListenerContainer container : listenerRegistry.getListenerContainers()) {
-            ContainerTestUtils.waitForAssignment(container, 1);
+            ContainerTestUtils.waitForAssignment(container, embeddedKafka.getPartitionsPerTopic());
         }
         Map<String, Object> props = KafkaTestUtils.consumerProps(embeddedKafka, "test-" + UUID.randomUUID(), false);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JacksonJsonDeserializer.class);
         props.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "com.appsdeveloperblog.core.*");
         productEvents = new KafkaConsumer<>(props);
-        TopicPartition partition = new TopicPartition("products-events", 0);
-        productEvents.assign(List.of(partition));
-        productEvents.seekToEnd(List.of(partition));
-        productEvents.position(partition);
+        List<TopicPartition> partitions = productEvents.partitionsFor("products-events").stream()
+                .map(info -> new TopicPartition(info.topic(), info.partition()))
+                .toList();
+        productEvents.assign(partitions);
+        productEvents.seekToEnd(partitions);
+        partitions.forEach(productEvents::position);
     }
 
     @AfterEach
